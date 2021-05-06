@@ -1,0 +1,50 @@
+Predicting the History of Giant Virus Hosts Based on Current and "Fossilized" Host Character Traits
+
+Methodology
+
+A phylogenetic tree was constructed first by concatenating four protein sequences from various giant virus lineages. The four proteins that were selected for phylogenetic analysis were the D5 helicase, DNA polymerase subunit B, major capsid protein, and AAA ATPase. After sequences for each lineage were concatenated, with consistent gaps for virus genomes that were missing any of these four proteins, sequences were aligned using MUSCLE and constructed into a phylogeny for further analysis. In order to do this, partitions were predicted using the software Partition Finder to select the best model for each protein sequence in the concatenated alignment. 
+
+A phylogenetic tree was constructed using the following parameters:
+raxmlHPC -m PROTGAMMAILG -p 12345 -q viralpartitions.txt -s concat_aligned.phy
+
+Following construction of the phylogram, our tree was dated using r8s in order to convert it to a cladogram. 
+
+In order to determine ancestral host relationships between giant viruses and eukaryotes, the proteins identified here were blasted against a non-redundant Eukaryotic database. Studies have shown that giant viruses often trade genes with hosts and leave traces of their genomes in the host genome (Moniruzzaman et al., 2020). Likewise, many assembled Eukaryotic genomes likely involved inadvertant assembly of giant viruses present in their cells, allowing for the false characterization of giant virus genes as Eukaryotic. For purposes here, we will characterize ancestral host invasion as having high scoring blast hits of giant virus genes against Eukaryotic organisms, though the metrics for this characterization may be subject to change. For simplicity sake, ancestral and current Eukaryotic hosts are broken into algae, protozoa, animals, and plants/fungi in euk_presence.csv. 1 denotes presence of the given virus in a specified clade and 0 denotes absence. 
+
+Following the establishment of ancestral and current traits for each virus in this study, the ancestral states of tree nodes were predicted based on both traits. This was done both by way of parsimony and by way of maximum likelihood. Following this step, the discrete data was fit to the tree coinciding with various models for rate matrices in order to determine the best fit for the transition matrix. Fits used for this matrix were ARD, MER, symmetrical, and meristic. The best fitted matrix for each set of character traits was then used to infer a proper matrix for rate approximation.
+
+First in order to perform rate approximation on ancestral host states, a matrix was constructed using 6 states, algae, algae+plant, algae+plant+animal, algae+animal, algae+protozoa, and algae+protozoa+plant. Though other states are technically possible among viruses, these have to be left out of the matrix such that corHMM can parse out transition rates. Performing this analysis with more viruses may allow for the inclusion of more of these states and therefore a larger matrix, with the likelihood of observing more states increasing. 
+
+The first matrix that was constructed was based on the meristic approach, in that transitions can occur between similarly related hosts, but is unlikely between widely different hosts. However, this matrix is not exactly meristic, as the transition back and forth between viral DNA being within a host genome is not necessarily the same rate. A virus leaving a DNA "fossil" in its host is possible if infection is common, but the rate at which the host expunges viral DNA from its genome as well as the difficulty in getting viral DNA back after the virus has speciated to the point where it no longer infects said host make the differences too significant. This "fixed" matrix had all values dropped that weren't direct jumps from one host range to the next. For instance, the rate of A to AM (algae to algae+animal) is kept in the matrix, but the rate of AL to AM (algae+plant to algae+animal) is dropped. Certain transitions had to be maintained for the sake of allowing the proper states to be achieved. For instance, transitions into PLM (protozoa+plant+animal) had to come from an algae based virus, because all other states had infected algae. While it is likely that several transitions occurred before the terminal PLM state could be achieved (AL -> ALM -> LM -> PLM for example), the lack of these states in our terminal virus states mean that we have to skip over these transitions.
+
+    A AL ALM AM AP PLM
+A   NA  4 NA  9 11 NA
+AL   1 NA  6 NA NA NA
+ALM NA  5 NA 10 12 NA
+AM   2 NA  7 NA NA 13
+AP   3 NA NA NA NA 14
+PLM NA NA  8 NA NA NA
+
+Still, this rate matrix could have been too restrictive as many states are missing from this matrix, so a "loose" model was constructed. This model allows for the transition from parallel states containing at least one of the same host and an equal host range (ALM -> PLM but not A -> PLM for example). 
+
+    A AL ALM AM AP PLM
+A    NA 6 NA 13 17 NA
+AL   1 NA 10 14 18 NA
+ALM  2  7 NA 15 19 21
+AM   3  8 11 NA 20 22
+AP   4  9 NA 16 NA 23
+PLM  5 NA 12 NA NA NA
+
+One matrix was also made that allowed protozoa, plant, and animal to transition to any other combination of hosts, as this category is the most distinct from the other groups and likely most restrictive.
+
+    A AL ALM AM AP PLM
+A    NA 6 NA 13 17 NA
+AL   1 NA 10 14 18 NA
+ALM  2  7 NA 15 19 21
+AM   3  8 11 NA 20 22
+AP   4  9 NA 16 NA 23
+PLM  5 24 12 25 26 NA
+
+Finally, a matrix was made that restricted the return of a trait to infecting plants. While giant virus artifacts can be identified in plant genomes, there is no current record of a large nucleocytoplasmic virus that infects plants or fungi. Therefore, it would make sense to constrain the model such that if a host loses the viral DNA artifact, it should not be able to recover it. This model however failed when placed into corHMM, likely based on the ability for the model to find the appropriate transitions to achieve the current states. 
+
+Once each of these were tested, the best matrix was selected based on AICc. Following this, six trials were repeated with the root node fixed in different states. The AICc of each of these results was then taken in order to determine which was the most likely ancestral host. The same process was done for current host traits, and differences between the two predictions were compared. 
